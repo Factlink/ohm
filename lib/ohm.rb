@@ -1617,7 +1617,7 @@ module Ohm
       @id = nil
       @_memo ||= {}
       @_attributes ||= Hash.new { |hash, key| hash[key] = read_remote(key) }
-      super
+      super()
       update_local(attrs)
     end
 
