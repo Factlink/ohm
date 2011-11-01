@@ -1644,7 +1644,7 @@ module Ohm
       @id = nil
       @_memo ||= {}
       @_attributes ||= Hash.new { |hash, key| hash[key] = lazy_fetch(key) }
-      super
+      super()
       update_local(attrs)
     end
 
