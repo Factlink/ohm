@@ -1298,6 +1298,17 @@ module Ohm
       collections(self) << name unless collections.include?(name)
     end
 
+    # Defines a sorted set attribute for the model. It can be accessed only after
+    # the model instance is created.
+    #
+    # @param [Symbol] name Name of the sorted set.
+    def self.sorted_set(name, model)
+      define_memoized_method(name) { SortedSet.new(key[name], Wrapper.wrap(model)) }
+      define_method(:"#{name}=") { |value| send(name).replace(value) }
+      collections(self) << name unless collections.include?(name)
+    end
+
+
     # Creates an index (a set) that will be used for finding instances.
     #
     # If you want to find a model instance by some attribute value, then an
