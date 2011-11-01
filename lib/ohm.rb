@@ -786,6 +786,128 @@ module Ohm
       end
     end
 
+    # Provides a Ruby-esque interface to a _Redis_ *ZSET*. The *ZSET* is assumed
+    # to be composed of ids which maps to {#model}.
+    class SortedSet < Collection
+      # An implementation which relies on *ZRANGE* and yields an instance
+      # of {#model}.
+      #
+      # @example
+      #
+      #   class Author < Ohm::Model
+      #     sorted_set :poems, Poem
+      #   end
+      #
+      #   class Poem < Ohm::Model
+      #   end
+      #
+      #   neruda = Author.create
+      #   neruda.poems.add(Poem.create)
+      #
+      #   neruda.poems.each do |poem|
+      #     # do something with the poem
+      #   end
+      #
+      # @see http://redis.io/commands/zrange ZRANGE
+      #      in Redis Command Reference.
+      def each(&block)
+        key.zrange(0,-1).each { |id| block.call(model.to_proc[id]) }
+      end
+
+      # Adds a model to this set.
+      #
+      # @param [#id] model Typically an instance of an {Ohm::Model} subclass.
+      #
+      # Note: currently always with score 1
+      #
+      # @see http://redis.io/commands/zadd ZADD in Redis
+      #      Command Reference.
+      def <<(model)
+        key.zadd(1,model.id)
+        self
+      end
+      alias add <<
+
+      # Thin Ruby interface wrapper for *ZCARD*.
+      #
+      # @return [Fixnum] The total number of members for this set.
+      # @see http://redis.io/commands/zcard ZCARD in Redis
+      #      Command Reference.
+      def size
+        key.zcard
+      end
+
+      # Thin Ruby interface wrapper for *ZREM*.
+      #
+      # @param [#id] member a member of this set.
+      # @see http://redis.io/commands/zrem ZREM in Redis
+      #      Command Reference.
+      def delete(member)
+        key.zrem(member.id)
+      end
+
+      # Array representation of this set.
+      #
+      # @example
+      #
+      #   class Author < Ohm::Model
+      #     sorted_set :posts, Post
+      #   end
+      #
+      #   class Post < Ohm::Model
+      #   end
+      #
+      #   author = Author.create
+      #   author.posts.add(Author.create(:id => "101"))
+      #   author.posts.add(Author.create(:id => "102"))
+      #
+      #   author.posts.all.is_a?(Array)
+      #   # => true
+      #
+      #   author.posts.all.include?(Author[101])
+      #   # => true
+      #
+      #   author.posts.all.include?(Author[102])
+      #   # => true
+      #
+      # @return [Array<Ohm::Model>] All members of this set.
+      def all
+        key.zrange(0,-1).map(&model)
+      end
+
+      # Returns by default the lowest score value for this set.
+      #
+      # @example
+      #
+      #   class Post < Ohm::Model
+      #     attribute :title
+      #   end
+      #
+      #   p1 = Post.create(:id => "101", :title => "Alpha")
+      #   p2 = Post.create(:id => "100", :title => "Beta")
+      #   p3 = Post.create(:id => "99", :title => "Gamma")
+      #
+      #   Post.all.is_a?(Ohm::Model::Set)
+      #   # => true
+      #
+      #   p3 == Post.all.first
+      #   # => true
+      #
+      # @return [Ohm::Model, nil] an {Ohm::Model} instance or nil if this
+      #         set is empty.
+      #
+      # @see file:README.html#sorting Sorting in the README.
+      def first()
+        model[key.zrange(0,0).first]
+      end
+
+      def inspect
+        "#<SortedSet (#{model}): #{key.smembers.inspect}>"
+      end
+   
+    end
+
+
     # Provides a Ruby-esque interface to a _Redis_ *LIST*. The *LIST* is
     # assumed to be composed of ids which maps to {#model}.
     class List < Collection
