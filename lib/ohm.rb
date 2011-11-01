@@ -890,14 +890,12 @@ module Ohm
       #
       # @return [Ohm::Model, nil] an {Ohm::Model} instance or nil if this
       #         set is empty.
-      #
-      # @see file:README.html#sorting Sorting in the README.
-      def first()
+      def first
         model[key.zrange(0,0).first]
       end
 
       def inspect
-        "#<SortedSet (#{model}): #{key.smembers.inspect}>"
+        "#<SortedSet (#{model}): #{key.zrange(0,-1).inspect}>"
       end
    
     end
