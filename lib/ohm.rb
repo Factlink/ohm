@@ -784,6 +784,14 @@ module Ohm
     # Provides a Ruby-esque interface to a _Redis_ *ZSET*. The *ZSET* is assumed
     # to be composed of ids which maps to {#model}.
     class SortedSet < Collection
+      
+      # SortedSet also takes a proc score_calculator, which defines how to calculate the
+      # score for an element
+      def initialize(name, model, &score_calculator)
+        @score_calculator = score_calculator
+        super(name, model)
+      end      
+
       # An implementation which relies on *ZRANGE* and yields an instance
       # of {#model}.
       #
@@ -817,8 +825,11 @@ module Ohm
       #
       # @see http://redis.io/commands/zadd ZADD in Redis
       #      Command Reference.
-      def <<(model)
-        key.zadd(1,model.id)
+      def <<(model, score=nil)
+        unless score
+          score = @score_calculator.call(model)
+        end
+        key.zadd(score,model.id)
         self
       end
       alias add <<
@@ -1287,8 +1298,8 @@ module Ohm
     # the model instance is created.
     #
     # @param [Symbol] name Name of the sorted set.
-    def self.sorted_set(name, model)
-      define_memoized_method(name) { SortedSet.new(key[name], Wrapper.wrap(model)) }
+    def self.sorted_set(name, model, &block)
+      define_memoized_method(name) { SortedSet.new(key[name], Wrapper.wrap(model), &block) }
       define_method(:"#{name}=") { |value| send(name).replace(value) }
       collections(self) << name unless collections.include?(name)
     end
