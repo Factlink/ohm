@@ -41,9 +41,14 @@ test "sorted set as attribute" do
   
   @u.posts << @p1
   @u.posts << @p2
-  
+
   assert_equal @u.posts.all, [@p1,@p2]
   assert_equal @u.posts.size, 2
   assert_equal @u.posts.first, @p1
+
+  @u2 = User.create(:email => "test@example.org")
+  @u2.posts = @u.posts
+  
+  assert_equal @u2.posts, @u.posts
   
 end

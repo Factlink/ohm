@@ -764,6 +764,11 @@ test "return instances of the passed model" do
   assert Post == @user.posts.first.class
 end
 
+test "assign of a set to another set" do
+  @user3 = User.create(:email => "bernardo@example.com")
+  @user3.posts = @user.posts
+end
+
 # Counters
 setup do
   @event = Event.create(:name => "Ruby Tuesday")

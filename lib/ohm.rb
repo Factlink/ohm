@@ -913,7 +913,6 @@ module Ohm
       def inspect
         "#<SortedSet (#{model}): #{key.zrange(0,-1).inspect}>"
       end
-   
     end
 
 
