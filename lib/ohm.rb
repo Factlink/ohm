@@ -910,6 +910,16 @@ module Ohm
         model[key.zrange(0,0).first]
       end
 
+      # Ruby-like interface wrapper around *ZRANK*.
+      #
+      # @param  [#id] model Typically an {Ohm::Model} instance.
+      #
+      # @return [true, false] Whether or not the {Ohm::Model model} instance
+      #         is a member of this sorted set.
+      def include?(model)
+        return !( key.zrank(model.id).nil? )
+      end
+
       def inspect
         "#<SortedSet (#{model}): #{key.zrange(0,-1).inspect}>"
       end
