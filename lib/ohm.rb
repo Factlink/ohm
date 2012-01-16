@@ -155,126 +155,6 @@ module Ohm
   #
   # @see Model.const_missing
   class Model
-
-    # Wraps a model name for lazy evaluation.
-    class Wrapper < BasicObject
-
-      # Allows you to use a constant even before it is defined. This solves
-      # the issue of having to require inter-project dependencies in a very
-      # simple and "magic-free" manner.
-      #
-      # Example of how it was done before Wrapper existed:
-      #
-      #   require "./app/models/user"
-      #   require "./app/models/comment"
-      #
-      #   class Post < Ohm::Model
-      #     reference :author, User
-      #     list :comments, Comment
-      #   end
-      #
-      # Now, you can simply do the following:
-      #   class Post < Ohm::Model
-      #     reference :author, User
-      #     list :comments, Comment
-      #   end
-      #
-      # @example
-      #
-      #   module Commenting
-      #     def self.included(base)
-      #       base.list :comments, Ohm::Model::Wrapper.new(:Comment) {
-      #         Object.const_get(:Comment)
-      #       }
-      #     end
-      #   end
-      #
-      #   # In your classes:
-      #   class Post < Ohm::Model
-      #     include Commenting
-      #   end
-      #
-      #   class Comment < Ohm::Model
-      #   end
-      #
-      #   p = Post.create
-      #   p.comments.empty?
-      #   # => true
-      #
-      #   p.comments.push(Comment.create)
-      #   p.comments.size == 1
-      #   # => true
-      #
-      # @param [Symbol, String] name Canonical name of wrapped class.
-      # @param [#to_proc] block Closure for getting the name of the constant.
-      def initialize(name, &block)
-        @name = name
-        @caller = ::Kernel.caller[2]
-        @block = block
-
-        class << self
-          def method_missing(method_id, *args)
-            ::Kernel.raise(
-              ::NoMethodError,
-              "You tried to call %s#%s, but %s is not defined on %s" % [
-                @name, method_id, @name, @caller
-              ]
-            )
-          end
-        end
-      end
-
-      # Used as a convenience for wrapping an existing constant into a
-      # {Ohm::Model::Wrapper wrapper object}.
-      #
-      # This is used extensively within the library for points where a user
-      # defined class (e.g. _Post_, _User_, _Comment_) is expected.
-      #
-      # You can also use this if you need to do uncommon things, such as
-      # creating your own {Ohm::Model::Set Set}, {Ohm::Model::List List}, etc.
-      #
-      # (*NOTE:* Keep in mind that the following code is given only as an
-      # educational example, and is in no way prescribed as good design.)
-      #
-      #   class User < Ohm::Model
-      #   end
-      #
-      #   User.create(:id => "1001")
-      #
-      #   Ohm.redis.sadd("myset", 1001)
-      #
-      #   key = Ohm::Key.new("myset", Ohm.redis)
-      #   set = Ohm::Model::Set.new(key, Ohm::Model::Wrapper.wrap(User))
-      #
-      #   [User[1001]] == set.all.to_a
-      #   # => true
-      #
-      # @see http://ohm.keyvalue.org/tutorials/chaining Chaining Ohm Sets
-      def self.wrap(object)
-        object.class == self ? object : new(object.inspect) { object }
-      end
-
-      # Evaluates the passed block in {Ohm::Model::Wrapper#initialize}.
-      #
-      # @return [Class] The wrapped class.
-      def unwrap
-        @block.call
-      end
-
-      # Since {Ohm::Model::Wrapper} is a subclass of _BasicObject_ we have
-      # to manually declare this.
-      #
-      # @return [Wrapper]
-      def class
-        Wrapper
-      end
-
-      # @return [String] A string describing this lazy object.
-      def inspect
-        "<Wrapper for #{@name} (in #{@caller})>"
-      end
-    end
-
     # Defines the base implementation for all enumerable types in Ohm,
     # which includes {Ohm::Model::Set Sets}, {Ohm::Model::List Lists} and
     # {Ohm::Model::Index Indices}.
@@ -288,10 +168,10 @@ module Ohm
       attr :model
 
       # @param [Key] key A key which includes a _Redis_ connection.
-      # @param [Ohm::Model::Wrapper] model A wrapped subclass of {Ohm::Model}.
+      # @param [Ohm::Model] model A subclass of {Ohm::Model}.
       def initialize(key, model)
         @key = key
-        @model = model.unwrap
+        @model = model
       end
 
       # Adds an instance of {Ohm::Model} to this collection.
@@ -698,7 +578,7 @@ module Ohm
       # @private
       def apply(operation, key, source, target)
         target.send(operation, key, *source)
-        Set.new(target, Wrapper.wrap(model))
+        Set.new(target, model)
       end
 
       # generate list of source indices and a target volatile index for the find
@@ -779,7 +659,7 @@ module Ohm
       def find(options)
         if options.keys.size == 1 && model.indices(model).include?(options.keys.first) &&
             ( String === options.values.first || !( Enumerable === options.values.first ))
-          Set.new(keys(options).first, Wrapper.wrap(model))
+          Set.new(keys(options).first, model)
         else
           super(options)
         end
@@ -1301,7 +1181,7 @@ module Ohm
     #
     # @param [Symbol] name Name of the list.
     def self.list(name, model)
-      define_memoized_method(name) { List.new(key[name], Wrapper.wrap(model)) }
+      define_memoized_method(name) { List.new(key[name], model) }
       define_method(:"#{name}=") { |value| send(name).replace(value) }
       collections(self) << name unless collections.include?(name)
     end
@@ -1313,7 +1193,7 @@ module Ohm
     #
     # @param [Symbol] name Name of the set.
     def self.set(name, model)
-      define_memoized_method(name) { Set.new(key[name], Wrapper.wrap(model)) }
+      define_memoized_method(name) { Set.new(key[name], model) }
       define_method(:"#{name}=") { |value| send(name).replace(value) }
       collections(self) << name unless collections.include?(name)
     end
@@ -1323,7 +1203,7 @@ module Ohm
     #
     # @param [Symbol] name Name of the sorted set.
     def self.sorted_set(name, model, &block)
-      define_memoized_method(name) { SortedSet.new(key[name], Wrapper.wrap(model), &block) }
+      define_memoized_method(name) { SortedSet.new(key[name], model, &block) }
       define_method(:"#{name}=") { |value| send(name).replace(value) }
       collections(self) << name unless collections.include?(name)
     end
@@ -1383,8 +1263,6 @@ module Ohm
     # @see file:README.html#references References Explained.
     # @see Ohm::Model.collection
     def self.reference(name, model)
-      model = Wrapper.wrap(model)
-
       reader = :"#{name}_id"
       writer = :"#{name}_id="
 
@@ -1393,7 +1271,7 @@ module Ohm
       index reader
 
       define_memoized_method(name) do
-        model.unwrap[send(reader)]
+        model[send(reader)]
       end
 
       define_method(:"#{name}=") do |value|
@@ -1456,9 +1334,8 @@ module Ohm
     #
     # @see file:README.html#collections Collections Explained.
     def self.collection(name, model, reference = to_reference)
-      model = Wrapper.wrap(model)
       define_method(name) {
-        model.unwrap.find(:"#{reference}_id" => send(:id))
+        model.find(:"#{reference}_id" => send(:id))
       }
     end
 
@@ -1512,13 +1389,13 @@ module Ohm
     #   Post.all.include?(post)
     #   # => false
     def self.all
-      Ohm::Model::Index.new(key[:all], Wrapper.wrap(self))
+      Ohm::Model::Index.new(key[:all], self)
     end
 
     # Return an empty {Ohm::Model::Set set}
     #FIXME this set should be read-only
     def self.none
-      Ohm::Model::Index.new(key[:_none], Wrapper.wrap(self))
+      Ohm::Model::Index.new(key[:_none], self)
     end
 
     # All the defined attributes within a class.
@@ -2120,23 +1997,6 @@ module Ohm
       else
         key.hset(att, value)
       end
-    end
-
-    # Wraps any missing constants lazily in {Ohm::Model::Wrapper} delaying
-    # the evaluation of constants until they are actually needed.
-    #
-    # @see Ohm::Model::Wrapper
-    # @see http://en.wikipedia.org/wiki/Lazy_evaluation Lazy evaluation
-    def self.const_missing(name)
-      wrapper = Wrapper.new(name) { const_get(name) }
-
-      # Allow others to hook to const_missing.
-      begin
-        super(name)
-      rescue NameError
-        wrapper
-      end
-
     end
 
   private
