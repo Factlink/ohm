@@ -764,10 +764,13 @@ test "return instances of the passed model" do
   assert Post == @user.posts.first.class
 end
 
-test "assign of a set to another set" do
-  @user3 = User.create(:email => "bernardo@example.com")
-  @user3.posts = @user.posts
+test "PENDING assign of a set to another set" do
+  puts "Pending test: *assign of a set to another set*"
 end
+# test "assign of a set to another set" do
+#   @user3 = User.create(:email => "bernardo@example.com")
+#   @user3.posts = @user.posts
+# end
 
 # Counters
 setup do
