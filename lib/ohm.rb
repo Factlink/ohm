@@ -281,6 +281,9 @@ module Ohm
     class Collection
       include Enumerable
 
+      # Seconds until a volatile key is timed out and deleted by Redis
+      VOLATILE_KEY_TIMEOUT = 300
+
       # An instance of {Ohm::Key}.
       attr :key
 
@@ -437,6 +440,13 @@ module Ohm
       def to_a
         all
       end
+
+    private
+    def temporary(ohm_obj)
+      ohm_obj.key.expire Ohm::Model::Collection::VOLATILE_KEY_TIMEOUT
+      ohm_obj
+    end
+
     end
 
     # Provides a Ruby-esque interface to a _Redis_ *SET*. The *SET* is assumed
