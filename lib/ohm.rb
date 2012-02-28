@@ -281,6 +281,9 @@ module Ohm
     class Collection
       include Enumerable
 
+      # Seconds until a volatile key is timed out and deleted by Redis
+      VOLATILE_KEY_TIMEOUT = 300
+
       # An instance of {Ohm::Key}.
       attr :key
 
@@ -437,6 +440,13 @@ module Ohm
       def to_a
         all
       end
+
+    private
+    def temporary(ohm_obj)
+      ohm_obj.key.expire Ohm::Model::Collection::VOLATILE_KEY_TIMEOUT
+      ohm_obj
+    end
+
     end
 
     # Provides a Ruby-esque interface to a _Redis_ *SET*. The *SET* is assumed
@@ -603,9 +613,9 @@ module Ohm
       # @return [Ohm::Model::Set] A set satisfying the filter passed.
       def find(options)
         source, target = find_source(options, :+)
-        apply(:sinterstore, key, source, target)        
+        apply(:sinterstore, key, source, target)
       end
-      
+
       # Similar to find except that it negates the criteria.
       #
       # @example
@@ -735,7 +745,7 @@ module Ohm
           end
         end.uniq
       end
-      
+
       def union_key_for(attr, values)
         source = values.map {|v| model.index_key_for(attr, v) }
         target = model.key_for( attr, source.reduce(&:*), :union ).volatile
@@ -789,13 +799,13 @@ module Ohm
     # Provides a Ruby-esque interface to a _Redis_ *ZSET*. The *ZSET* is assumed
     # to be composed of ids which maps to {#model}.
     class SortedSet < Collection
-      
+
       # SortedSet also takes a proc score_calculator, which defines how to calculate the
       # score for an element
       def initialize(name, model, &score_calculator)
         @score_calculator = score_calculator
         super(name, model)
-      end      
+      end
 
       # An implementation which relies on *ZRANGE* and yields an instance
       # of {#model}.
@@ -1234,7 +1244,7 @@ module Ohm
     def [](attr)
       send(attr)
     end
-    
+
     # shortcut for writing an attribute value
     def []=(attr, val)
       send(:"#{attr}=", val)
@@ -1537,7 +1547,7 @@ module Ohm
     def self.serializers(klass=root)
       klass ? @@serializers[klass] : @@serializers
     end
-      
+
     # All the defined counters within a class.
     # @see Ohm::Model.counter
     def self.counters(klass=nil)
@@ -1616,7 +1626,7 @@ module Ohm
     def self.encode(value)
       Base64.strict_encode64(digest(value.to_s))
     end
-    
+
     # Optionally digest a long key name with a hash function if the key is longer than the hash
     def self.digest(value)
       value
@@ -1692,7 +1702,7 @@ module Ohm
       type =  args.shift || attrs[:id] && self.polymorphic && read_remote(root.key[attrs[:id]], :_type)
       klass = constantize( type.to_s ) if type
 
-      instance = 
+      instance =
         if klass && klass < self
           klass.new( klass, attrs )
         elsif !klass || klass == self
@@ -1707,7 +1717,7 @@ module Ohm
       end
       instance
     end
-    
+
     # @return [true, false] Whether or not this object has an id.
     def new?
       !@id
@@ -1721,7 +1731,7 @@ module Ohm
       return false unless valid?
       _create
     end
-    
+
     # Create or update this object based on the state of #new?.
     #
     # @return [Ohm::Model, nil] The saved object or nil if it fails
@@ -1731,7 +1741,7 @@ module Ohm
       return false unless valid?
       _save
     end
-    
+
     # Update this object, optionally accepting new attributes.
     #
     # @param [Hash] attrs Attribute value pairs to use for the updated
@@ -1743,7 +1753,7 @@ module Ohm
       save
     end
     alias_method :update_attributes, :update
-    
+
     # Locally update all attributes without persisting the changes.
     # Internally used by {Ohm::Model#initialize} and {Ohm::Model#update}
     # to set attribute value pairs.
@@ -1767,7 +1777,7 @@ module Ohm
       self
     end
     alias_method :destroy, :delete
-    
+
     # Increment the counter denoted by :att.
     #
     # @param [Symbol] att Attribute to increment.
@@ -2000,7 +2010,7 @@ module Ohm
     def root
       self.class.root
     end
-    
+
     def self.root
       @root ||= ( !(base == superclass || base == self) && superclass.respond_to?(:root) ) ? superclass.root : self
     end
@@ -2020,14 +2030,14 @@ module Ohm
     def self.polymorphs
       @_descendants ||= descendants.select{|klass| klass < Ohm::Model }
     end
-    
+
   protected
 
     # Return the list of attributes, collections, counters etc. for inspect
     def attributes_for_inspect
       (attributes + collections + counters)
     end
-    
+
     attr :_type
     attr_writer :id
 
@@ -2038,7 +2048,7 @@ module Ohm
     # internal create action
     def _create
       initialize_id if new?
-        
+
       mutex do
         create_model_membership
         write
@@ -2084,9 +2094,9 @@ module Ohm
       end
       @changed = false
     end
-    
+
     # Get and serialize the attribute value for att for writing to the database
-    # This is a hook used e.g. by Serialized 
+    # This is a hook used e.g. by Serialized
     def serialize(att, val=send(att))
       val.to_s
     end
@@ -2145,7 +2155,7 @@ module Ohm
     def self.all_ancestors(attr)
       model_ancestors.map { |klass| attr[klass] }.flatten
     end
-    
+
     # cache model ancestors
     def self.model_ancestors
       @_model_ancestors ||= begin
@@ -2194,7 +2204,7 @@ module Ohm
     def initialize_id
       @id ||= root.key[:id].incr.to_s
     end
-    
+
     def db
       self.class.db
     end
@@ -2218,7 +2228,7 @@ module Ohm
         def base
           @base ||= self
         end
-        
+
         def logger
           @logger ||= nil || superclass.logger rescue nil
         end
@@ -2310,7 +2320,7 @@ module Ohm
     def _write_local(att, value)
       @_attributes[att] = value
     end
-    
+
     # Used internally be the @_attributes hash to lazily load attributes
     # when you need them. You may also use this in your code if you know what
     # you are doing.
@@ -2320,7 +2330,7 @@ module Ohm
     def lazy_fetch(att)
       self.class.read_remote(key,att) unless new?
     end
-    
+
     # Used internally to read a remote attribute and force the encoding
     #
     # @param  [Symbol] att The attribute you you want to get.
