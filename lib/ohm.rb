@@ -338,8 +338,6 @@ module Ohm
       # @see http://code.google.com/p/redis/wiki/SortCommand SORT in the
       #      Redis Command Reference.
       def sort(options = {})
-        return [] unless key.exists
-
         opts = options.dup
         opts[:start] ||= 0
         opts[:limit] = [opts[:start], opts[:limit]] if opts[:limit]
@@ -360,8 +358,6 @@ module Ohm
       #
       # @see file:README.html#sorting Sorting in the README.
       def sort_by(att, options = {})
-        return [] unless key.exists
-
         opts = options.dup
         opts.merge!(:by => model.root.key["*->#{att}"])
 
