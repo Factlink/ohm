@@ -2133,17 +2133,19 @@ module Ohm
     #
     # @see Ohm::Model::Wrapper
     # @see http://en.wikipedia.org/wiki/Lazy_evaluation Lazy evaluation
-    def self.const_missing(name)
-      wrapper = Wrapper.new(name) { const_get(name) }
 
-      # Allow others to hook to const_missing.
-      begin
-        super(name)
-      rescue NameError
-        wrapper
-      end
+    # Disabled, causes more trouble than it solves
+    # def self.const_missing(name)
+    #   wrapper = Wrapper.new(name) { const_get(name) }
 
-    end
+    #   # Allow others to hook to const_missing.
+    #   begin
+    #     super(name)
+    #   rescue NameError
+    #     wrapper
+    #   end
+
+    # end
 
   private
 
